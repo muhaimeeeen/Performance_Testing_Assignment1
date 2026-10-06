@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Group 9 — Ticket Labelling</title>
+<style>
+  :root { --ink:#1d1d1f; --muted:#6e6e73; --line:#e3e3e8; --accent:#0a5cd5; --bg:#ffffff; --soft:#f5f5f7; --warn:#b25000; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; color:var(--ink); background:var(--bg); }
+  header { display:flex; align-items:center; gap:16px; padding:12px 20px; border-bottom:1px solid var(--line); position:sticky; top:0; background:#fff; z-index:2; }
+  header h1 { font-size:15px; margin:0; font-weight:600; }
+  .bar { flex:1; height:6px; background:var(--soft); border-radius:3px; overflow:hidden; }
+  .bar > div { height:100%; background:var(--accent); width:0; }
+  .count { color:var(--muted); font-variant-numeric:tabular-nums; min-width:90px; text-align:right; }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:24px; padding:20px; max-width:1200px; margin:0 auto; }
+  @media (max-width:900px){ main { grid-template-columns:1fr; } }
+  .meta { color:var(--muted); font-size:13px; margin-bottom:8px; }
+  .ticket { white-space:pre-wrap; background:var(--soft); border-radius:8px; padding:16px 18px; max-height:52vh; overflow:auto; }
+  .choices { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:16px; }
+  .choices button { text-align:left; padding:10px 12px; border:1px solid var(--line); background:#fff; border-radius:6px; font:inherit; cursor:pointer; }
+  .choices button:hover { border-color:#b9b9c2; }
+  .choices button.on { border-color:var(--accent); background:#eef4ff; }
+  .choices kbd, .keys kbd { font:12px ui-monospace, Menlo, monospace; border:1px solid var(--line); border-radius:4px; padding:0 5px; margin-right:8px; color:var(--muted); }
+  .row { display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap; }
+  .row input[type=text] { flex:1; min-width:200px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; font:inherit; }
+  .btn { padding:8px 14px; border:1px solid var(--line); background:#fff; border-radius:6px; font:inherit; cursor:pointer; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  label.chk { display:flex; gap:6px; align-items:center; color:var(--warn); }
+  aside { font-size:13px; color:#3a3a3c; }
+  aside h2 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:0 0 8px; }
+  aside dl { margin:0 0 16px; } aside dt { font-weight:600; margin-top:8px; } aside dd { margin:0; }
+  aside ul { padding-left:18px; margin:0; } aside li { margin-bottom:6px; }
+  .start { max-width:520px; margin:12vh auto; padding:0 20px; }
+  .start select, .start input { width:100%; padding:10px; font:inherit; border:1px solid var(--line); border-radius:6px; margin:6px 0 14px; }
+  .hidden { display:none !important; }
+  .keys { color:var(--muted); font-size:12px; margin-top:14px; }
+  .toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#1d1d1f; color:#fff; padding:8px 14px; border-radius:6px; font-size:13px; opacity:0; transition:opacity .2s; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<section id="start" class="start">
+  <h1 style="font-size:22px;margin:0 0 6px">Golden set labelling</h1>
+  <p style="color:var(--muted);margin:0 0 20px">Group 9 · 160 tickets · label independently, don't compare answers until both files are submitted.</p>
+  <label>Your name</label>
+  <select id="who">
+    <option value="">Select…</option>
+    <option>Muhaimin</option><option>Alvin</option><option>Irfan</option><option>Uwais</option><option>Gabriel</option>
+  </select>
+  <button class="btn primary" id="begin">Start / resume</button>
+  <p style="color:var(--muted);font-size:13px;margin-top:18px">Progress saves in this browser automatically. Use <b>Export CSV</b> at any time as a backup, and <b>Resume from CSV</b> to continue on another browser.</p>
+  <input type="file" id="resume" accept=".csv" class="hidden">
+</section>
+
+<div id="app" class="hidden">
+<header>
+  <h1 id="title">Labelling</h1>
+  <div class="bar"><div id="prog"></div></div>
+  <span class="count" id="count">0 / 160</span>
+  <button class="btn" id="loadcsv">Resume from CSV</button>
+  <button class="btn primary" id="export">Export CSV</button>
+</header>
+<main>
+  <section>
+    <div class="meta" id="meta"></div>
+    <div class="ticket" id="ticket"></div>
+    <div class="choices" id="choices"></div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="unsure"> Unsure</label>
+      <input type="text" id="note" placeholder="Note (optional) — e.g. 'card vs credit report, see E1'">
+    </div>
+    <div class="row">
+      <button class="btn" id="prev">← Previous</button>
+      <button class="btn" id="next">Next →</button>
+      <button class="btn" id="jump">Next unlabelled</button>
+    </div>
+    <div class="keys"><kbd>1</kbd>–<kbd>7</kbd> choose &nbsp; <kbd>0</kbd> none &nbsp; <kbd>U</kbd> unsure &nbsp; <kbd>N</kbd> note &nbsp; <kbd>←</kbd><kbd>→</kbd> move</div>
+  </section>
+  <aside>
+    <h2>Which desk has to fix it?</h2>
+    <dl>
+      <dt>1 Credit reporting</dt><dd>Credit report errors, bureau disputes, inquiries, scores.</dd>
+      <dt>2 Debt collection</dt><dd>Third-party collectors / debt buyers: calls, validation, "not my debt".</dd>
+      <dt>3 Mortgage</dt><dd>Home loans, servicing, escrow, modification, foreclosure, HELOC.</dd>
+      <dt>4 Credit card</dt><dd>Credit &amp; prepaid cards: charges, fees, APR, rewards, billing disputes.</dd>
+      <dt>5 Bank account or service</dt><dd>Checking/savings, overdraft, holds, closures, debit card.</dd>
+      <dt>6 Consumer loan</dt><dd>Auto, personal, payday, title, student loans.</dd>
+      <dt>7 Money transfer or service</dt><dd>Wires, remittances, Zelle/PayPal/Venmo/Cash App, money orders, crypto.</dd>
+    </dl>
+    <h2>Tie-breakers</h2>
+    <ul>
+      <li><b>E1</b> Fighting the bureau / fixing the report → Credit reporting. Lender mishandled the account → the product.</li>
+      <li><b>E2</b> Fighting the collector → Debt collection.</li>
+      <li><b>E3</b> Original bank chasing its own debt → the product.</li>
+      <li><b>E4</b> Debit card → Bank account. Zelle / wire / PayPal → Money transfer.</li>
+      <li><b>E5</b> Student &amp; car loans → Consumer loan.</li>
+      <li><b>E6</b> Two products → the one whose team must act.</li>
+      <li><b>E8</b> Scams → the channel the money moved through.</li>
+      <li><b>E7</b> None → no financial product at all (rare).</li>
+    </ul>
+  </aside>
+</main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const TICKETS = __TICKETS_JSON__;
+const CATS = ["Credit reporting","Debt collection","Mortgage","Credit card","Bank account or service","Consumer loan","Money transfer or service"];
+const NONE = "None";
+let who = "", idx = 0, labels = {};
+
+const $ = id => document.getElementById(id);
+const key = () => "g9-labels-" + who;
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1400); }
+function save(){ try { localStorage.setItem(key(), JSON.stringify({labels, idx})); } catch(e){ /* storage unavailable: rely on export */ } }
+function load(){ try { const s=JSON.parse(localStorage.getItem(key())||"null"); if(s){ labels=s.labels||{}; idx=s.idx||0; } } catch(e){ labels={}; idx=0; } }
+function done(){ return Object.values(labels).filter(l=>l && l.label).length; }
+
+function render(){
+  const t = TICKETS[idx], cur = labels[t.item] || {};
+  $("meta").textContent = `Ticket ${t.item} of ${TICKETS.length} · dataset row ${t.row}`;
+  $("ticket").textContent = t.text;            // textContent: narratives are untrusted
+  $("ticket").scrollTop = 0;
+  const box = $("choices"); box.replaceChildren();
+  [...CATS, NONE].forEach((c,i)=>{
+    const b=document.createElement("button"); const k=document.createElement("kbd");
+    k.textContent = c===NONE ? "0" : String(i+1); b.append(k, c);
+    if(cur.label===c) b.classList.add("on");
+    b.onclick=()=>choose(c); box.append(b);
+  });
+  $("unsure").checked = !!cur.unsure; $("note").value = cur.note || "";
+  const n=done(); $("count").textContent=`${n} / ${TICKETS.length}`; $("prog").style.width=(100*n/TICKETS.length)+"%";
+}
+function upd(patch){ const t=TICKETS[idx]; labels[t.item]={...(labels[t.item]||{}), ...patch, ts:new Date().toISOString()}; save(); }
+function choose(c){ upd({label:c}); if(idx<TICKETS.length-1){ idx++; } else { toast("Last ticket — export your CSV"); } save(); render(); }
+function move(d){ idx=Math.max(0,Math.min(TICKETS.length-1,idx+d)); save(); render(); }
+function nextUnlabelled(){ const j=TICKETS.findIndex(t=>!(labels[t.item]&&labels[t.item].label)); if(j<0){toast("All labelled");return;} idx=j; save(); render(); }
+
+function csvCell(v){ v = v==null ? "" : String(v); return /[",\n\r]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+function exportCsv(){
+  const head=["item","row","label","unsure","note","labeller","labelled_at"];
+  const lines=[head.join(",")];
+  TICKETS.forEach(t=>{ const l=labels[t.item]||{}; lines.push([t.item,t.row,l.label||"",l.unsure?1:0,l.note||"",who,l.ts||""].map(csvCell).join(",")); });
+  const blob=new Blob([lines.join("\n")+"\n"],{type:"text/csv"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=`labels_${who.toLowerCase()}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  toast(`Exported ${done()} labels`);
+}
+function parseCsv(text){
+  const rows=[]; let row=[], cell="", q=false;
+  for(let i=0;i<text.length;i++){ const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else q=false; } else cell+=ch; }
+    else if(ch==='"') q=true; else if(ch===','){row.push(cell);cell="";}
+    else if(ch==='\n'){row.push(cell);rows.push(row);row=[];cell="";} else if(ch!=='\r') cell+=ch; }
+  if(cell||row.length){row.push(cell);rows.push(row);} return rows;
+}
+function resumeFrom(file){
+  const r=new FileReader();
+  r.onload=()=>{ const rows=parseCsv(r.result); const h=rows.shift()||[]; const ix=n=>h.indexOf(n);
+    const valid=new Set([...CATS,NONE]); let n=0;
+    rows.forEach(c=>{ const item=c[ix("item")], lab=c[ix("label")]; if(item && valid.has(lab)){ labels[item]={label:lab,unsure:c[ix("unsure")]==="1",note:c[ix("note")]||"",ts:c[ix("labelled_at")]||""}; n++; } });
+    save(); nextUnlabelled(); render(); toast(`Loaded ${n} labels`); };
+  r.readAsText(file);
+}
+
+$("begin").onclick=()=>{ who=$("who").value; if(!who){toast("Pick your name first");return;}
+  load(); $("start").classList.add("hidden"); $("app").classList.remove("hidden");
+  $("title").textContent=`Labelling — ${who}`; render(); };
+$("prev").onclick=()=>move(-1); $("next").onclick=()=>move(1); $("jump").onclick=nextUnlabelled;
+$("export").onclick=exportCsv;
+$("loadcsv").onclick=()=>$("resume").click();
+$("resume").onchange=e=>{ if(e.target.files[0]) resumeFrom(e.target.files[0]); e.target.value=""; };
+$("unsure").onchange=e=>upd({unsure:e.target.checked});
+$("note").oninput=e=>upd({note:e.target.value});
+document.addEventListener("keydown",e=>{
+  if($("app").classList.contains("hidden")) return;
+  if(document.activeElement===$("note")){ if(e.key==="Escape"||e.key==="Enter") $("note").blur(); return; }
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  if(/^[1-7]$/.test(e.key)) choose(CATS[+e.key-1]);
+  else if(e.key==="0") choose(NONE);
+  else if(e.key==="ArrowRight") move(1);
+  else if(e.key==="ArrowLeft") move(-1);
+  else if(e.key.toLowerCase()==="u"){ $("unsure").checked=!$("unsure").checked; upd({unsure:$("unsure").checked}); }
+  else if(e.key.toLowerCase()==="n"){ e.preventDefault(); $("note").focus(); }
+});
+</script>
+</body>
+</html>

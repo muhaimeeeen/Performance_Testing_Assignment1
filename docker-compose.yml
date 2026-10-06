@@ -1,0 +1,38 @@
+# Group 9 — Ticket Triage Service (Assignment 1 baseline)
+# Usage:  MODEL=llama3.2:1b docker compose up -d --build
+# Docker Desktop on macOS has no GPU passthrough, so Ollama runs CPU-only here.
+services:
+  ollama:
+    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
+    ports:
+      - "127.0.0.1:11434:11434"          # not exposed to the LAN
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      OLLAMA_NUM_PARALLEL: "1"           # one inference at a time: sequential baseline
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_KEEP_ALIVE: "-1"            # keep model resident so runs are not skewed by reloads
+      OLLAMA_MAX_QUEUE: "512"            # Ollama default; requests beyond this get HTTP 503
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  triage:
+    build: ./service
+    ports:
+      - "0.0.0.0:8000:8000"              # reachable by the JMeter machine on the LAN
+    environment:
+      MODEL: ${MODEL:-llama3.2:1b}
+      OLLAMA_URL: http://ollama:11434
+      LOG_FILE: /logs/service.jsonl
+      DB_PATH: /data/tickets.db          # inside the container: recreating it empties the store
+    volumes:
+      - ./logs:/logs
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+volumes:
+  ollama_models:
