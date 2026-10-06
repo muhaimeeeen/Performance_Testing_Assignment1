@@ -3,7 +3,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /srv
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app ./app
+COPY --chown=10001:10001 app ./app
 RUN useradd --create-home --uid 10001 triage && mkdir -p /data /logs && chown triage /data /logs
 USER triage
 EXPOSE 8000
